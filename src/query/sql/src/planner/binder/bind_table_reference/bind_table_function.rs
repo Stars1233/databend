@@ -115,6 +115,10 @@ impl Binder {
             );
         }
 
+        if func_name.name.eq_ignore_ascii_case("obfuscate") {
+            return self.bind_obfuscate(bind_context, params, named_params);
+        }
+
         let mut scalar_binder = ScalarBinder::new(
             bind_context,
             self.ctx.clone(),
@@ -324,7 +328,7 @@ impl Binder {
                 alias,
                 ..
             } => {
-                let mut bind_context = BindContext::with_parent(Box::new(parent_context.clone()));
+                let mut bind_context = BindContext::with_parent(parent_context.clone())?;
                 let func_name = normalize_identifier(name, &self.name_resolution_ctx);
 
                 if BUILTIN_FUNCTIONS

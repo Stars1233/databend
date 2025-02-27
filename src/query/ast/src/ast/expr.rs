@@ -18,6 +18,7 @@ use std::fmt::Formatter;
 
 use derive_visitor::Drive;
 use derive_visitor::DriveMut;
+use educe::Educe;
 use enum_as_inner::EnumAsInner;
 use ethnum::i256;
 use pratt::Affix;
@@ -45,7 +46,12 @@ use crate::ParseError;
 use crate::Result;
 use crate::Span;
 
-#[derive(Debug, Clone, PartialEq, Drive, DriveMut)]
+#[derive(Educe, Drive, DriveMut)]
+#[educe(
+    PartialEq(bound = false, attrs = "#[recursive::recursive]"),
+    Clone(bound = false, attrs = "#[recursive::recursive]"),
+    Debug(bound = false, attrs = "#[recursive::recursive]")
+)]
 pub enum Expr {
     /// Column reference, with indirection like `table.column`
     ColumnRef {
@@ -259,6 +265,9 @@ pub enum Expr {
         span: Span,
         name: String,
     },
+    Placeholder {
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -298,7 +307,8 @@ impl Expr {
             | Expr::LastDay { span, .. }
             | Expr::PreviousDay { span, .. }
             | Expr::NextDay { span, .. }
-            | Expr::Hole { span, .. } => *span,
+            | Expr::Hole { span, .. }
+            | Expr::Placeholder { span } => *span,
         }
     }
 
@@ -444,6 +454,7 @@ impl Expr {
             Expr::PreviousDay { span, date, .. } => merge_span(*span, date.whole_span()),
             Expr::NextDay { span, date, .. } => merge_span(*span, date.whole_span()),
             Expr::Hole { span, .. } => *span,
+            Expr::Placeholder { span } => *span,
         }
     }
 
@@ -778,6 +789,9 @@ impl Display for Expr {
                 Expr::Hole { name, .. } => {
                     write!(f, ":{name}")?;
                 }
+                Expr::Placeholder { .. } => {
+                    write!(f, "?")?;
+                }
             }
 
             if need_paren {
@@ -828,6 +842,8 @@ pub enum IntervalKind {
     Doy,
     Week,
     Dow,
+    Epoch,
+    MicroSecond,
 }
 
 impl Display for IntervalKind {
@@ -843,6 +859,8 @@ impl Display for IntervalKind {
             IntervalKind::Doy => "DOY",
             IntervalKind::Dow => "DOW",
             IntervalKind::Week => "WEEK",
+            IntervalKind::Epoch => "EPOCH",
+            IntervalKind::MicroSecond => "MICROSECOND",
         })
     }
 }
@@ -2119,7 +2137,7 @@ impl ExprReplacer {
             Expr::NextDay { date, .. } => {
                 self.replace_expr(date);
             }
-            Expr::Literal { .. } | Expr::Hole { .. } => (),
+            Expr::Literal { .. } | Expr::Hole { .. } | Expr::Placeholder { .. } => (),
         }
     }
 }
